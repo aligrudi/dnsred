@@ -58,13 +58,13 @@ static int mksocket(char *addr, char *port, int tcp)
 static void dnslog(char *msg, int msg_n)
 {
 	char name[512];
-	char *s = msg + 12;
-	char *d = name;
 	int i;
 	if (msg_n < 16)
 		return;
 	/* DNS packet header: ID (2), flags (2), query count (2) */
 	if (ntohs(*(short *) (msg + 4)) > 0) {
+		char *s = msg + 12;
+		char *d = name;
 		while (s < msg + msg_n && *s) {
 			int n = *(unsigned char *) s++;
 			if (s + n >= msg + msg_n || d + n + 1 >= name + sizeof(name))
@@ -74,9 +74,9 @@ static void dnslog(char *msg, int msg_n)
 			if (*s)
 				*d++ = '.';
 		}
+		*d = '\0';
+		printf("%ld\t%s\n", time(NULL), name);
 	}
-	*d = '\0';
-	printf("%ld\t%s\n", time(NULL), name);
 }
 
 int main(int argc, char *argv[])
