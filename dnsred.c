@@ -1,9 +1,19 @@
 /*
  * dnsred: redirect DNS queries
  *
- * Copyright (C) 2015 Ali Gholami Rudi <ali at rudi dot ir>
+ * Copyright (C) 2015-2019 Ali Gholami Rudi <ali at rudi dot ir>
  *
- * This program is released under the Modified BSD license.
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -12,6 +22,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 static int mksocket(char *addr, char *port, int tcp)
@@ -44,6 +55,30 @@ static int mksocket(char *addr, char *port, int tcp)
 	return fd;
 }
 
+static void dnslog(char *msg, int msg_n)
+{
+	char name[512];
+	char *s = msg + 12;
+	char *d = name;
+	int i;
+	if (msg_n < 16)
+		return;
+	/* DNS packet header: ID (2), flags (2), query count (2) */
+	if (ntohs(*(short *) (msg + 4)) > 0) {
+		while (s < msg + msg_n && *s) {
+			int n = *(unsigned char *) s++;
+			if (s + n >= msg + msg_n || d + n + 1 >= name + sizeof(name))
+				break;
+			for (i = 0; i < n; i++)
+				*d++ = *s++;
+			if (*s)
+				*d++ = '.';
+		}
+	}
+	*d = '\0';
+	printf("%ld\t%s\n", time(NULL), name);
+}
+
 int main(int argc, char *argv[])
 {
 	char msg[2048];
@@ -53,6 +88,7 @@ int main(int argc, char *argv[])
 	char *host, *port;
 	int ifd;
 	int tcp = 0;
+	int log = 0;
 	int i;
 	for (i = 1; i < argc && argv[i][0] == '-'; i++) {
 		switch (argv[i][1]) {
@@ -62,11 +98,15 @@ int main(int argc, char *argv[])
 		case 'u':
 			tcp = 0;
 			break;
+		case 'l':
+			log = 1;
+			break;
 		default:
 			printf("usage: dnsred [options] dest_host dest_port\n");
 			printf("options:\n");
 			printf("  -u   send UDP requests\n");
 			printf("  -t   send TCP requests\n");
+			printf("  -l   log DNS requests\n");
 			return 1;
 		}
 	}
@@ -77,6 +117,8 @@ int main(int argc, char *argv[])
 				(void *) &addr, &addr_n)) > 0) {
 		int ofd = mksocket(host, port, tcp);
 		int len = htons(msg_n);
+		if (log)
+			dnslog(msg, msg_n);
 		if (tcp)
 			send(ofd, &len, 2, 0);
 		send(ofd, msg, msg_n, 0);
