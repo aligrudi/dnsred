@@ -1,0 +1,14 @@
+DNSRED
+======
+
+DNSRED redirects DNS queries to other UDP/TCP DNS servers.
+The following examples show how it can be used:
+
+Redirect DNS packets to 4.2.2.4:
+$ dnsred 4.2.2.4
+
+Redirect DNS packets as TCP DNS requests to port 53 of 4.2.2.4:
+$ dnsred -t 4.2.2.4
+
+Redirect DNS packets to port 1053 of the same machine:
+$ dnsred 127.0.0.1 1053
